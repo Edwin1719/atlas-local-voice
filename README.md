@@ -4,6 +4,7 @@
 [![Pruebas](https://img.shields.io/badge/tests-63%20passing-brightgreen)]()
 [![Runtime](https://img.shields.io/badge/runtime-Ollama-black)]()
 [![Local](https://img.shields.io/badge/local--first-100%25-informational)]()
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 Asistente conversacional **voz a voz** que corre íntegramente en tu equipo:
 escucha sin pulsar nada, responde hablando y busca en internet cuando hace falta.
@@ -502,6 +503,18 @@ por tramos.
   engañoso; instantáneas sí, flujo continuo no.
 
 ---
+## Licencia
+
+Código bajo **MIT**: puedes usarlo, modificarlo, distribuirlo y venderlo, siempre
+que conserves el aviso de autoría. Ver [LICENSE](LICENSE).
+
+El **modelo** es independiente del código y tiene su propia licencia
+([LFM-1.0](https://huggingface.co/LiquidAI/LFM3-Omni-2B)). Esta licencia cubre
+lo que hay en este repositorio, no los pesos ni los servicios de terceros que
+consume.
+
+---
+
 ## Créditos
 
 - Modelo [LFM3-Omni-2B](https://huggingface.co/LiquidAI/LFM3-Omni-2B) de Liquid AI
