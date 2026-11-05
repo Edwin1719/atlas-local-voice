@@ -1,9 +1,13 @@
 # Atlas — asistente de voz local
 
-Asistente conversacional **voz a voz** que corre íntegramente en tu equipo.
-Sin nube, sin claves de API, sin enviar audio a terceros.
+[![Python](https://img.shields.io/badge/python-3.13-blue)]()
+[![Pruebas](https://img.shields.io/badge/tests-63%20passing-brightgreen)]()
+[![Runtime](https://img.shields.io/badge/runtime-Ollama-black)]()
+[![Local](https://img.shields.io/badge/local--first-100%25-informational)]()
 
-Escuchas, hablas, responde con voz y vuelve a escuchar. Todo de forma continua.
+Asistente conversacional **voz a voz** que corre íntegramente en tu equipo:
+escucha sin pulsar nada, responde hablando y busca en internet cuando hace falta.
+Sin nube, sin claves de API, sin enviar tu audio a terceros.
 
 ---
 
