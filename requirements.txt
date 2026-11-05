@@ -1,0 +1,7 @@
+# Python 3.13
+flet[cli,desktop]==1.1.0
+# Audio real por PortAudio: tasa garantizada y reproducción sin cortes
+sounddevice>=0.5.6
+numpy>=2.2
+# Cliente HTTP para Ollama
+httpx>=0.28.1,<1.0

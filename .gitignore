@@ -1,0 +1,24 @@
+# Entorno
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Modelos y artefactos pesados
+models/
+assets/
+inputs/
+outputs/
+
+# Audio de pruebas
+*.wav
+*.mp3
+*.ogg
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.log
+
+# Variables locales
+.env
