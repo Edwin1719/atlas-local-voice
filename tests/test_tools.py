@@ -5,7 +5,20 @@ import asyncio
 import unittest
 from unittest import mock
 
-from atlas.tools import TOOLS, _url_real, execute, parse_results
+from atlas.tools import (
+    GOOGLE_NEWS_SEARCH,
+    GOOGLE_NEWS_TOP,
+    TOOLS,
+    _edicion,
+    _es_generica,
+    _hace,
+    _url_real,
+    buscar_web,
+    es_consulta_de_noticias,
+    execute,
+    parse_news,
+    parse_results,
+)
 
 HTML = """
 <div class="result">
@@ -129,6 +142,126 @@ class TestEjecucion(unittest.TestCase):
 
         self.assertEqual(intentos["n"], 2)
         self.assertIn("no está disponible", salida)
+
+NEWS_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <item>
+    <title>Dólar hoy en Colombia: así arranca el precio | El Espectador - El Espectador</title>
+    <pubDate>Fri, 06 Nov 2026 13:45:00 GMT</pubDate>
+    <source url="https://www.elespectador.com">El Espectador</source>
+  </item>
+  <item>
+    <title>Convocan a paro nacional en Colombia | Últimas Noticias</title>
+    <pubDate>Fri, 06 Nov 2026 13:16:42 GMT</pubDate>
+    <source url="https://ultimasnoticias.com.ve">Últimas Noticias</source>
+  </item>
+  <item>
+    <title>Fiscalía confirma imputación - Revista Semana</title>
+    <pubDate>Fri, 06 Nov 2026 12:00:00 GMT</pubDate>
+    <source url="https://www.semana.com">Revista Semana</source>
+  </item>
+  <item>
+    <title>Cuarto titular sin fuente</title>
+  </item>
+</channel></rss>
+"""
+
+
+class TestEnrutadoDeNoticias(unittest.TestCase):
+
+    def test_reconoce_consulta_de_noticias(self):
+        self.assertTrue(es_consulta_de_noticias("últimas noticias de Colombia"))
+        self.assertTrue(es_consulta_de_noticias("titulares de hoy"))
+        self.assertFalse(es_consulta_de_noticias("precio del dólar"))
+
+    def test_distingue_peticion_generica_de_tema(self):
+        self.assertTrue(_es_generica("últimas noticias de Colombia para hoy"))
+        self.assertTrue(_es_generica("noticias"))
+        self.assertFalse(_es_generica("noticias del paro nacional"))
+        self.assertFalse(_es_generica("noticias de la selección"))
+
+    def test_edicion_por_pais(self):
+        self.assertEqual(_edicion("noticias de Colombia")[0], ("es-CO", "CO", "CO:es-419"))
+        self.assertEqual(_edicion("noticias de México")[0], ("es-419", "MX", "MX:es-419"))
+
+
+class TestTitulares(unittest.TestCase):
+
+    def test_parsea_titulos_fuente_y_fecha(self):
+        noticias = parse_news(NEWS_XML)
+        self.assertEqual(len(noticias), 4)
+        self.assertEqual(noticias[0]["titulo"], "Dólar hoy en Colombia: así arranca el precio")
+        self.assertEqual(noticias[0]["fuente"], "El Espectador")
+        self.assertEqual(noticias[1]["titulo"], "Convocan a paro nacional en Colombia")
+        self.assertEqual(noticias[2]["titulo"], "Fiscalía confirma imputación")
+        self.assertEqual(noticias[3]["fuente"], "")
+
+    def test_xml_invalido_no_rompe(self):
+        self.assertEqual(parse_news("<html>no es rss</html>"), [])
+
+    def test_hace_relativo(self):
+        self.assertEqual(_hace(""), "")
+        self.assertEqual(_hace("no es fecha"), "")
+        self.assertIn("días", _hace("Fri, 06 Nov 2020 13:45:00 GMT"))
+
+
+class RespuestaNoticias:
+    status_code = 200
+    text = NEWS_XML
+
+
+class ClienteNoticias:
+    instancias = []
+
+    def __init__(self, *a, **k):
+        self.llamadas = []
+        ClienteNoticias.instancias.append(self)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def get(self, url, params=None, headers=None):
+        self.llamadas.append((url, dict(params or {})))
+        return RespuestaNoticias()
+
+
+class TestBusquedaDeNoticias(unittest.TestCase):
+
+    def setUp(self):
+        ClienteNoticias.instancias.clear()
+
+    def test_portada_para_peticion_generica(self):
+        with mock.patch("atlas.tools.httpx.AsyncClient", ClienteNoticias):
+            salida = asyncio.run(buscar_web("últimas noticias de Colombia para hoy"))
+        llamada = ClienteNoticias.instancias[0].llamadas[0]
+        self.assertEqual(llamada[0], GOOGLE_NEWS_TOP)
+        self.assertEqual(llamada[1]["ceid"], "CO:es-419")
+        self.assertIn("El Espectador", salida)
+        self.assertIn("Titulares recientes", salida)
+        self.assertNotIn("https://", salida)
+
+    def test_busqueda_con_fecha_para_tema_concreto(self):
+        with mock.patch("atlas.tools.httpx.AsyncClient", ClienteNoticias):
+            asyncio.run(buscar_web("noticias del paro nacional"))
+        llamada = ClienteNoticias.instancias[0].llamadas[0]
+        self.assertEqual(llamada[0], GOOGLE_NEWS_SEARCH)
+        self.assertIn("when:1d", llamada[1]["q"])
+        self.assertIn("paro nacional", llamada[1]["q"])
+
+    def test_consulta_con_solo_pais_va_a_noticias(self):
+        with mock.patch("atlas.tools.httpx.AsyncClient", ClienteNoticias):
+            asyncio.run(buscar_web("Colombia hoy"))
+        self.assertEqual(ClienteNoticias.instancias[0].llamadas[0][0], GOOGLE_NEWS_TOP)
+
+    def test_tres_titulares_como_maximo(self):
+        with mock.patch("atlas.tools.httpx.AsyncClient", ClienteNoticias):
+            salida = asyncio.run(buscar_web("noticias de Colombia"))
+        self.assertEqual(len(salida.splitlines()), 4)  # cabecera + 3
+        self.assertNotIn("Cuarto titular", salida)
+
 
 if __name__ == "__main__":
     unittest.main()

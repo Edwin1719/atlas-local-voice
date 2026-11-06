@@ -5,3 +5,5 @@ sounddevice>=0.5.6
 numpy>=2.2
 # Cliente HTTP para Ollama
 httpx>=0.28.1,<1.0
+# Cámara opcional: captura y JPEG (rueda binaria para Python 3.13)
+opencv-python-headless==5.0.0.93

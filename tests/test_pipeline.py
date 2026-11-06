@@ -6,6 +6,7 @@ secuencia real: saludo → escucha → turno → respuesta → vuelta a escuchar
 from __future__ import annotations
 
 import asyncio
+import base64
 import unittest
 
 import numpy as np
@@ -196,6 +197,217 @@ class TestFlujoCompleto(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ejecuciones[0][0], "buscar_web")
         self.assertEqual(ejecuciones[0][1], {"consulta": "prueba"})
         self.assertIn("búsqueda", self.assistant.history[-1]["content"])
+
+    async def test_acumula_tool_calls_de_varios_fragmentos(self):
+        """En streaming, varios fragmentos con tool_calls se suman, no se pisan."""
+        from unittest import mock
+
+        ejecuciones = []
+
+        async def fake_execute(nombre, argumentos):
+            ejecuciones.append((nombre, argumentos))
+            return "resultado"
+
+        async def planner(messages, tools=None, options=None):
+            if options and "num_predict" in options:
+                yield {
+                    "type": "tool_calls",
+                    "calls": [{"function": {"name": "buscar_web", "arguments": {"consulta": "uno"}}}],
+                }
+                yield {
+                    "type": "tool_calls",
+                    "calls": [{"function": {"name": "buscar_web", "arguments": {"consulta": "dos"}}}],
+                }
+                return
+            yield {"type": "token", "text": "Listo."}
+
+        self.assistant.client.stream_events = planner
+        with mock.patch("atlas.app.execute", fake_execute):
+            await self.assistant._respond("dos búsquedas", 0.1)
+
+        self.assertEqual(
+            [argumentos for _, argumentos in ejecuciones],
+            [{"consulta": "uno"}, {"consulta": "dos"}],
+        )
+
+    async def test_segunda_ronda_de_herramienta(self):
+        """Si el modelo pide otra búsqueda tras ver los resultados, se ejecuta."""
+        from unittest import mock
+
+        ejecuciones = []
+        finales = {"n": 0}
+
+        async def fake_execute(nombre, argumentos):
+            ejecuciones.append((nombre, argumentos))
+            return "resultado"
+
+        async def planner(messages, tools=None, options=None):
+            if options and "num_predict" in options:
+                yield {
+                    "type": "tool_calls",
+                    "calls": [{"function": {"name": "buscar_web", "arguments": {"consulta": "primera"}}}],
+                }
+                return
+            finales["n"] += 1
+            if finales["n"] == 1:
+                yield {
+                    "type": "tool_calls",
+                    "calls": [{"function": {"name": "buscar_web", "arguments": {"consulta": "segunda"}}}],
+                }
+                return
+            yield {"type": "token", "text": "Respuesta final."}
+
+        self.assistant.client.stream_events = planner
+        with mock.patch("atlas.app.execute", fake_execute):
+            await self.assistant._respond("pregunta", 0.1)
+
+        self.assertEqual(
+            [argumentos for _, argumentos in ejecuciones],
+            [{"consulta": "primera"}, {"consulta": "segunda"}],
+        )
+        self.assertIn("Respuesta final", self.assistant.history[-1]["content"])
+
+    async def test_conserva_contenido_y_thinking_en_el_mensaje(self):
+        """El mensaje del asistente lleva content y thinking, no solo tool_calls."""
+        from unittest import mock
+
+        capturado = {}
+
+        async def planner(messages, tools=None, options=None):
+            if options and "num_predict" in options:
+                yield {"type": "thinking", "text": "pienso"}
+                yield {"type": "token", "text": "Voy a buscar. "}
+                yield {
+                    "type": "tool_calls",
+                    "calls": [{"function": {"name": "buscar_web", "arguments": {"consulta": "x"}}}],
+                }
+                return
+            capturado["mensajes"] = list(messages)
+            yield {"type": "token", "text": "ok"}
+
+        self.assistant.client.stream_events = planner
+        with mock.patch("atlas.app.execute", mock.AsyncMock(return_value="r")):
+            await self.assistant._respond("pregunta", 0.1)
+
+        asistente = next(m for m in capturado["mensajes"] if m["role"] == "assistant")
+        self.assertEqual(asistente["thinking"], "pienso")
+        self.assertEqual(asistente["content"], "Voy a buscar. ")
+        self.assertEqual(
+            asistente["tool_calls"][0]["function"]["arguments"], {"consulta": "x"}
+        )
+
+
+    async def test_mensaje_con_imagen_lleva_base64(self):
+        imagen = b"\xff\xd8foto"
+        mensajes = self.assistant._messages_for("¿qué ves?", image=imagen)
+        self.assertEqual(mensajes[-1]["role"], "user")
+        self.assertEqual(
+            mensajes[-1]["images"], [base64.b64encode(imagen).decode("ascii")]
+        )
+        self.assertTrue(
+            any(
+                "imagen" in m.get("content", "").lower()
+                for m in mensajes
+                if m["role"] == "system"
+            )
+        )
+
+    async def test_respuesta_envia_imagen_solo_en_la_llamada_final(self):
+        capturado = {}
+
+        async def planner(messages, tools=None, options=None):
+            if options and "num_predict" in options:
+                capturado["decision"] = list(messages)
+                return
+            capturado["final"] = list(messages)
+            yield {"type": "token", "text": "Es una taza."}
+
+        self.assistant.client.stream_events = planner
+        imagen = b"\xff\xd8foto"
+        await self.assistant._respond("¿qué ves?", 0.1, image=imagen)
+
+        self.assertNotIn("images", capturado["decision"][-1])
+        self.assertEqual(
+            capturado["final"][-1]["images"],
+            [base64.b64encode(imagen).decode("ascii")],
+        )
+        self.assertIn("taza", self.assistant.history[-1]["content"])
+
+    async def test_supports_vision_lee_capacidades(self):
+        class Respuesta:
+            status_code = 200
+
+            def json(self):
+                return {"capabilities": ["completion", "vision"]}
+
+        class Http:
+            async def post(self, *args, **kwargs):
+                return Respuesta()
+
+        original = self.assistant.client._http
+        self.assistant.client._http = Http()
+        try:
+            self.assertTrue(await self.assistant.client.supports_vision())
+        finally:
+            self.assistant.client._http = original
+
+
+    async def test_camara_ui_flujo(self):
+        from unittest import mock
+
+        class FakeCamera:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+                self.started = False
+                self.stopped = False
+                self.active = False
+                self.error = ""
+
+            def start(self):
+                self.started = True
+                self.active = True
+
+            def preview(self):
+                return 1, b"preview"
+
+            def snapshot(self):
+                return b"snap"
+
+            def stop(self):
+                self.stopped = True
+                self.active = False
+
+        async def supports_vision():
+            return True
+
+        self.assistant.client.supports_vision = supports_vision
+        with mock.patch("atlas.app.camera_available", return_value=True), mock.patch(
+            "atlas.app.CameraWorker", FakeCamera
+        ):
+            await self.assistant._start_camera()
+            self.assertTrue(self.assistant.camera_card.visible)
+            self.assertTrue(self.assistant._camera_active)
+
+            self.assistant._paint_camera()
+            self.assertEqual(self.assistant.camera_image.src, b"preview")
+            self.assertFalse(self.assistant.camera_snap_button.disabled)
+
+            self.assistant._on_camera_snap()
+            self.assertEqual(self.assistant._pending_image, b"snap")
+
+            await self.assistant._stop_camera()
+            self.assertFalse(self.assistant.camera_card.visible)
+            self.assertIsNone(self.assistant._pending_image)
+            self.assertFalse(self.assistant._camera_active)
+
+    async def test_camara_sin_opencv(self):
+        from unittest import mock
+
+        with mock.patch("atlas.app.camera_available", return_value=False):
+            await self.assistant._start_camera()
+        self.assertFalse(self.assistant._camera_active)
+        self.assertIn("OpenCV", self.assistant.status.value)
+
 
 if __name__ == "__main__":
     unittest.main()

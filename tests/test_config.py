@@ -19,6 +19,10 @@ class TestDefaults(unittest.TestCase):
         self.assertTrue(s.web_search_enabled)
         self.assertTrue(s.hands_free)
         self.assertTrue(s.barge_in)
+        self.assertEqual(s.camera_index, 0)
+        self.assertEqual(s.camera_width, 1280)
+        self.assertEqual(s.camera_height, 720)
+        self.assertEqual(s.camera_preview_fps, 8.0)
 
     def test_no_depende_del_entorno(self):
         with mock.patch.dict(os.environ, {}, clear=True):
@@ -35,6 +39,20 @@ class TestVariablesDeEntorno(unittest.TestCase):
         self.assertEqual(s.assistant_name, "Nova")
         self.assertEqual(s.voice, "male-spanish")
         self.assertFalse(s.hands_free)
+
+    def test_camara_por_entorno(self):
+        env = {
+            "VA_CAMERA_INDEX": "2",
+            "VA_CAMERA_WIDTH": "640",
+            "VA_CAMERA_HEIGHT": "480",
+            "VA_CAMERA_PREVIEW_FPS": "5",
+        }
+        with mock.patch.dict(os.environ, env, clear=True):
+            s = load_settings()
+        self.assertEqual(s.camera_index, 2)
+        self.assertEqual(s.camera_width, 640)
+        self.assertEqual(s.camera_height, 480)
+        self.assertEqual(s.camera_preview_fps, 5.0)
 
     def test_valor_numerico_invalido_cae_al_defecto(self):
         with mock.patch.dict(os.environ, {"VA_VAD_SILENCE": "no-es-un-numero"}, clear=True):

@@ -80,6 +80,21 @@ class VoiceClient:
             + "Cambia VA_MODEL o ejecuta: ollama pull {}".format(base)
         )
 
+    async def supports_vision(self) -> bool:
+        """True si el modelo declara capacidad de visión en /api/show."""
+        try:
+            response = await self._http.post(
+                "/api/show", json={"model": self._settings.model}
+            )
+        except httpx.HTTPError:
+            return False
+        if response.status_code != 200:
+            return False
+        try:
+            return "vision" in response.json().get("capabilities", [])
+        except ValueError:
+            return False
+
     # ---------------------------------------------------------------- ASR
 
     async def transcribe(self, pcm: bytes) -> str:
@@ -128,10 +143,11 @@ class VoiceClient:
         tools: Sequence[dict] | None = None,
         options: dict | None = None,
     ) -> AsyncIterator[dict]:
-        """Emite eventos del chat: {"type": "token"} o {"type": "tool_calls"}.
+        """Emite eventos del chat: token, thinking o tool_calls.
 
-        En streaming, Ollama manda los tool_calls completos en el primer fragmento y
-        con el contenido vacío, así que se puede decidir antes de emitir texto.
+        En streaming, el cliente debe acumular los tres campos y devolverlos
+        juntos en el mensaje del asistente antes de pedir la respuesta final
+        (documentado en «Tool calling with streaming» de Ollama).
         """
         payload = {
             "model": self._settings.model,
@@ -157,6 +173,9 @@ class VoiceClient:
                     if error:
                         raise OllamaError("Ollama devolvió un error: {}".format(error))
                     message = chunk.get("message") or {}
+                    pensamiento = message.get("thinking") or ""
+                    if pensamiento:
+                        yield {"type": "thinking", "text": pensamiento}
                     llamadas = message.get("tool_calls")
                     if llamadas:
                         yield {"type": "tool_calls", "calls": llamadas}

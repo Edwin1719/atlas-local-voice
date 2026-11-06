@@ -98,11 +98,30 @@ python -m pip install --only-binary=:all: -r requirements.txt
 
 ---
 
-## La búsqueda dice que no está disponible
+## Responde con portales en vez de noticias
 
-**Causa:** DuckDuckGo limita el tráfico automatizado y responde `202` (bloqueo
-blando) o `429`. No es un fallo del código: el endpoint gratuito no tiene clave ni
-cuota acordada, y tras muchas búsquedas seguidas corta durante un rato.
+**Síntoma:** preguntas «las últimas noticias de Colombia» y contesta «consulta
+EL TIEMPO, El Espectador…» sin contar ninguna noticia.
+
+**Causa histórica (corregida en 0.11):** la búsqueda iba a DuckDuckGo, que para
+esa consulta devuelve las portadas de los medios. El modelo solo repetía sus
+descripciones.
+
+**Ahora:** las consultas con palabras de noticias van a Google News RSS y
+devuelven titulares reales con medio y hora. Si vuelve a pasar:
+
+- comprobar que `VA_WEB_SEARCH` no está en `0`;
+- comprobar que `https://news.google.com/rss` responde desde el equipo;
+- revisar la salida de `buscar_web` para ver qué fuente se usó.
+
+---
+
+## La búsqueda general dice que no está disponible
+
+**Causa (solo DuckDuckGo, consultas que no son noticias):** DuckDuckGo limita el
+tráfico automatizado y responde `202` (bloqueo blando) o `429`. No es un fallo del
+código: el endpoint gratuito no tiene clave ni cuota acordada, y tras muchas
+búsquedas seguidas corta durante un rato.
 
 **Qué hace la aplicación:** un `429` se reintenta una vez tras 1,5 s; un `202` no se
 reintenta porque no mejora en segundos. En ambos casos el asistente responde que no
@@ -115,6 +134,41 @@ pudo buscar, en lugar de inventar.
 3. Para uso intensivo, cambiar a un proveedor con clave (Brave, Tavily, Serper).
    La herramienta está aislada en `atlas/tools.py`: cambiar de proveedor es tocar
    una función.
+
+---
+
+## La cámara no abre
+
+1. Comprueba que OpenCV está instalado:
+
+```powershell
+python -m pip install --only-binary=:all: opencv-python-headless==5.0.0.93
+```
+
+2. Windows → Configuración → Privacidad → Cámara: permite el acceso a aplicaciones
+   de escritorio.
+3. Cierra otras aplicaciones que estén usando la cámara.
+4. Prueba otro índice: `$env:VA_CAMERA_INDEX="1"`.
+5. En Windows se intenta `CAP_DSHOW` y luego el backend por defecto. Si el driver
+   falla, actualízalo desde el fabricante.
+
+## La cámara abre pero no hay imagen
+
+- La primera imagen puede tardar 1–3 s; espera a que «Mira esto» se habilite.
+- Si el estado dice «La cámara no entrega imagen», ciérrala y vuelve a abrirla.
+- Un antivirus o una política del equipo puede bloquear el dispositivo: la app
+  muestra el error, no intenta rodearlo.
+
+## El modelo no acepta imágenes
+
+La cámara comprueba `/api/show`. Si el modelo configurado no declara `vision`,
+no se abre. Usa `lfm3-omni:2b` o cambia `VA_MODEL` por un modelo con visión.
+
+## Lee mal el texto de la imagen
+
+Es una limitación medida de `lfm3-omni:2b`: describe objetos y escenas, pero puede
+leer «ERROR 404» como «ERROR 40.4». Para texto fiable hace falta OCR o un modelo
+mayor. No es un fallo de la cámara.
 
 ---
 

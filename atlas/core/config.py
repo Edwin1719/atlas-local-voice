@@ -115,6 +115,12 @@ class Settings:
     vad_min_speech_s: float = 0.5
     vad_max_turn_s: float = 30.0
 
+    # --- Cámara ---
+    camera_index: int = 0
+    camera_width: int = 1280
+    camera_height: int = 720
+    camera_preview_fps: float = 8.0
+
     # --- Herramientas ---
     web_search_enabled: bool = True
 
@@ -173,6 +179,10 @@ def load_settings(**overrides) -> Settings:
         vad_silence_s=_env_type("VA_VAD_SILENCE", _DEFAULTS.vad_silence_s, float),
         vad_min_speech_s=_env_type("VA_VAD_MIN_SPEECH", _DEFAULTS.vad_min_speech_s, float),
         vad_max_turn_s=_env_type("VA_VAD_MAX_TURN", _DEFAULTS.vad_max_turn_s, float),
+        camera_index=_env_type("VA_CAMERA_INDEX", _DEFAULTS.camera_index, int),
+        camera_width=_env_type("VA_CAMERA_WIDTH", _DEFAULTS.camera_width, int),
+        camera_height=_env_type("VA_CAMERA_HEIGHT", _DEFAULTS.camera_height, int),
+        camera_preview_fps=_env_type("VA_CAMERA_PREVIEW_FPS", _DEFAULTS.camera_preview_fps, float),
         web_search_enabled=_env_bool("VA_WEB_SEARCH", _DEFAULTS.web_search_enabled),
         assistant_name=_env_str("VA_NAME", _DEFAULTS.assistant_name),
         history_turns=_env_type("VA_HISTORY_TURNS", _DEFAULTS.history_turns, int),

@@ -32,7 +32,9 @@ archivos de configuración.
 |---|---|---|
 | `VA_WEB_SEARCH` | `1` | `0` desactiva la búsqueda web y el tráfico a internet |
 
-La búsqueda usa DuckDuckGo (HTML), sin clave de API. Cuando está activa, una
+La búsqueda usa **Google News RSS** para noticias (titulares reales con medio y
+hora, edición por país; Colombia por defecto) y **DuckDuckGo (HTML)** para el
+resto, sin clave de API en ninguno de los dos casos. Cuando está activa, una
 pregunta que dependa de hechos actuales hace dos llamadas al modelo (decidir y
 redactar) y añade ~1,5 s al turno.
 
@@ -76,6 +78,19 @@ Para conocer los índices, ejecuta la app y abre los desplegables del pie, o:
 ```powershell
 python -c "import sounddevice as sd; print(sd.query_devices())"
 ```
+
+## Cámara
+
+| Variable | Defecto | Descripción |
+|---|---|---|
+| `VA_CAMERA_INDEX` | `0` | Índice de cámara |
+| `VA_CAMERA_WIDTH` | `1280` | Ancho de captura |
+| `VA_CAMERA_HEIGHT` | `720` | Alto de captura |
+| `VA_CAMERA_PREVIEW_FPS` | `8` | FPS de la vista previa |
+
+La cámara se enciende desde la interfaz y está apagada al arrancar. Requiere
+`opencv-python-headless` (incluido en `requirements.txt`). La imagen se envía
+solo a Ollama local y se descarta después del turno.
 
 ## Conversación
 

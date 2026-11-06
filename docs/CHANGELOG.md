@@ -1,5 +1,62 @@
 # Historial de versiones
 
+## 0.13.1 — Interfaz estable + reactor
+
+- Restaura la interfaz anterior de dos columnas y el pie original; se retira el
+  HUD de tres columnas que recortaba el panel derecho y la cinta inferior.
+- Integra el reactor de `atlas/ui/reactor.py` en el escenario central y ajusta
+  la paleta al estilo de sala de control.
+- Restaura la barra de frecuencia de 28 barras bajo el reactor, animada con el
+  nivel de voz; se descarta el túnel de fondo por no alcanzar la referencia.
+- Conserva la cámara: tarjeta en el lateral, vista previa, «Mira esto» y envío
+  de la instantánea con la siguiente pregunta.
+- 87 pruebas en verde.
+
+## 0.13 — Cámara bajo demanda
+
+- Cámara opcional con `opencv-python-headless`: `atlas/vision/camera.py`
+  captura en un hilo, entrega vista previa JPEG y snapshot bajo demanda.
+- Tarjeta CÁMARA en el lateral, icono en la cabecera y botón «Mira esto».
+  Una instantánea se adjunta solo a la siguiente pregunta y se descarta después.
+- La imagen viaja como `images` (base64) en la llamada final; la llamada de
+  decisión sigue siendo solo texto.
+- `supports_vision()` consulta `/api/show` antes de abrir la cámara.
+- OpenCV se importa de forma perezosa: sin él, el resto del asistente funciona y
+  la cámara muestra un aviso de instalación.
+- `VA_CAMERA_INDEX`, `VA_CAMERA_WIDTH`, `VA_CAMERA_HEIGHT` y
+  `VA_CAMERA_PREVIEW_FPS`.
+- Once pruebas nuevas (cámara, imagen y UI); 87 en total.
+- Limitación medida: el OCR de `lfm3-omni` no es fiable; se documenta.
+
+## 0.12 — Llamado a herramientas según Ollama
+
+- Acumula `tool_calls`, `content` y `thinking` de todos los fragmentos del
+  stream; antes se quedaba con el último y podía perder fragmentos.
+- El mensaje del asistente se reconstruye con `content` y `thinking`, no con un
+  `content` vacío, como documenta Ollama para streaming con herramientas.
+- Agent loop acotado: si el modelo pide otra búsqueda tras ver los resultados, se
+  ejecuta una ronda más. Antes esa petición se ignoraba y la respuesta podía
+  quedar vacía.
+- `num_predict` de la llamada de decisión sube de 96 a 256: con 96, qwen3.5 se
+  cortaba pensando antes de llamar a la herramienta.
+- Tres pruebas nuevas (acumulación, segunda ronda y conservación de
+  `content`/`thinking`); 76 en total.
+
+## 0.11 — Noticias reales
+
+- `buscar_web` enruta las consultas de noticias a **Google News RSS**: titulares
+  reales con el medio y la hora, en lugar de las portadas que devolvía
+  DuckDuckGo. El asistente ya no responde «consulta EL TIEMPO»: cuenta las
+  noticias del día.
+- Edición por país (Colombia por defecto): una petición genérica usa la portada
+  del día y una con tema concreto usa la búsqueda con `when:1d`.
+- Tres titulares como máximo y sin URLs; la instrucción de redacción exige
+  hechos concretos y prohíbe recomendar portales.
+- Se quitan los sufijos duplicados del medio en los títulos
+  («… | El Colombiano - El Colombiano»).
+- Diez pruebas nuevas: enrutado, RSS, ediciones, recencia, país y tope de
+  titulares.
+
 ## 0.10 — Estabilidad
 
 - Manejo del límite de DuckDuckGo: `429` reintenta una vez; `202` avisa sin
