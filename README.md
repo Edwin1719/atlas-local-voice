@@ -11,7 +11,7 @@ escucha sin pulsar nada, responde hablando, busca noticias actuales y puede mira
 una imagen cuando se lo pides. Sin nube, sin claves de API y sin enviar tu audio a
 terceros.
 
-https://cdn.prod.website-files.com/69e88fad27076384f555afc6/6a3c0e210626d7893a92d456_Contact-Center-AI-Voice-Agents.png
+![texto del vínculo](https://cdn.prod.website-files.com/69e88fad27076384f555afc6/6a3c0e210626d7893a92d456_Contact-Center-AI-Voice-Agents.png)
 
 ---
 
